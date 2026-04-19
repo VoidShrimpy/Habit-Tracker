@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Návyky" />
+  <title>Návyky</title>
+  <style>
+    /* ── Základní reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #f5f5f7;
+      --surface:   #ffffff;
+      --border:    rgba(0,0,0,0.1);
+      --text:      #1c1c1e;
+      --muted:     #6e6e73;
+      --green:     #34c759;
+      --green-bg:  #e8f8ed;
+      --red:       #ff3b30;
+      --red-bg:    #fff0ef;
+      --blue:      #007aff;
+      --radius:    14px;
+      --safe-top:  env(safe-area-inset-top, 0px);
+      --safe-bot:  env(safe-area-inset-bottom, 0px);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:       #000000;
+        --surface:  #1c1c1e;
+        --border:   rgba(255,255,255,0.1);
+        --text:     #f5f5f7;
+        --muted:    #8e8e93;
+        --green-bg: #0d2e17;
+        --red-bg:   #2d0d0b;
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding-top: var(--safe-top);
+      padding-bottom: var(--safe-bot);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ── */
+    .screen { display: none; flex-direction: column; min-height: 100dvh; }
+    .screen.active { display: flex; }
+
+    .nav-bar {
+      padding: 16px 20px 8px;
+      background: var(--bg);
+    }
+    .nav-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .nav-subtitle { font-size: 14px; color: var(--muted); margin-top: 2px; }
+
+    .content { flex: 1; padding: 12px 16px; overflow-y: auto; }
+
+    /* ── Tab bar ── */
+    .tab-bar {
+      display: flex;
+      background: var(--surface);
+      border-top: 0.5px solid var(--border);
+      padding-bottom: var(--safe-bot);
+    }
+    .tab-item {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 10px 0; gap: 3px;
+      cursor: pointer; border: none; background: none;
+      color: var(--muted); font-size: 10px; font-weight: 500;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tab-item.active { color: var(--blue); }
+    .tab-icon { font-size: 22px; line-height: 1; }
+
+    /* ── Karty návyků ── */
+    .habit-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .habit-info { flex: 1; min-width: 0; }
+    .habit-name { font-size: 16px; font-weight: 500; }
+    .habit-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+    .btn-group { display: flex; gap: 8px; flex-shrink: 0; }
+    .circle-btn {
+      width: 38px; height: 38px; border-radius: 50%;
+      border: 1.5px solid var(--border);
+      background: transparent; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; color: var(--muted);
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.1s;
+    }
+    .circle-btn:active { transform: scale(0.92); }
+    .circle-btn.yes { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+    .circle-btn.no  { background: var(--red-bg);   border-color: var(--red);   color: var(--red);   }
+
+    /* ── Přehled / statistiky ── */
+    .stats-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px; margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 14px 10px; text-align: center;
+    }
+    .stat-num { font-size: 26px; font-weight: 700; }
+    .stat-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+    .history-card {
+      background: var(--surface); border-radius: var(--radius);
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .history-day { padding: 12px 16px; border-bottom: 0.5px solid var(--border); }
+    .history-day:last-child { border-bottom: none; }
+    .history-date { font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+    .history-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+    .pill {
+      font-size: 12px; padding: 3px 10px; border-radius: 20px;
+      font-weight: 500;
+    }
+    .pill.done { background: var(--green-bg); color: var(--green); }
+    .pill.fail { background: var(--red-bg);   color: var(--red);   }
+
+    /* ── Správa návyků ── */
+    .input-row {
+      display: flex; gap: 10px; margin-bottom: 16px;
+    }
+    .input-row input {
+      flex: 1; padding: 12px 14px;
+      background: var(--surface); border: 0.5px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-size: 16px; outline: none;
+      -webkit-appearance: none;
+    }
+    .input-row input::placeholder { color: var(--muted); }
+    .btn-add {
+      padding: 12px 18px; background: var(--blue); color: white;
+      border: none; border-radius: var(--radius);
+      font-size: 15px; font-weight: 600; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .manage-card {
+      background: var(--surface); border-radius: var(--radius);
+      overflow: hidden; margin-bottom: 10px;
+    }
+    .manage-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 0.5px solid var(--border);
+    }
+    .manage-row:last-child { border-bottom: none; }
+    .manage-name { font-size: 16px; }
+    .btn-delete {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 0.5px solid var(--border); background: transparent;
+      color: var(--red); font-size: 18px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ── Nastavení / data ── */
+    .settings-section { margin-bottom: 20px; }
+    .settings-label {
+      font-size: 13px; color: var(--muted); font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 0 4px; margin-bottom: 8px;
+    }
+    .settings-card {
+      background: var(--surface); border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .settings-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px; border-bottom: 0.5px solid var(--border);
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row-label { font-size: 16px; }
+    .settings-row-hint { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .settings-arrow { color: var(--muted); font-size: 18px; }
+
+    .btn-primary {
+      width: 100%; padding: 15px; background: var(--blue); color: white;
+      border: none; border-radius: var(--radius);
+      font-size: 17px; font-weight: 600; cursor: pointer;
+      margin-bottom: 10px; -webkit-tap-highlight-color: transparent;
+    }
+    .btn-danger {
+      width: 100%; padding: 15px; background: var(--red-bg); color: var(--red);
+      border: none; border-radius: var(--radius);
+      font-size: 17px; font-weight: 600; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .empty {
+      text-align: center; padding: 48px 24px;
+      color: var(--muted); font-size: 15px; line-height: 1.6;
+    }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+    .save-banner {
+      position: fixed; bottom: calc(70px + var(--safe-bot)); left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #1c1c1e; color: white;
+      padding: 10px 20px; border-radius: 20px;
+      font-size: 14px; font-weight: 500;
+      opacity: 0; transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none; white-space: nowrap;
+      z-index: 100;
+    }
+    .save-banner.show {
+      opacity: 1; transform: translateX(-50%) translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════
+     OBRAZOVKA: DNES
+══════════════════════════════ -->
+<div id="screen-dnes" class="screen active">
+  <div class="nav-bar">
+    <div class="nav-title">Návyky</div>
+    <div class="nav-subtitle" id="dnes-datum"></div>
+  </div>
+  <div class="content" id="dnes-list"></div>
+  <div class="tab-bar">
+    <button class="tab-item active" onclick="switchTab('dnes')">
+      <span class="tab-icon">✓</span>Dnes
+    </button>
+    <button class="tab-item" onclick="switchTab('prehled')">
+      <span class="tab-icon">📊</span>Přehled
+    </button>
+    <button class="tab-item" onclick="switchTab('sprava')">
+      <span class="tab-icon">✏️</span>Správa
+    </button>
+    <button class="tab-item" onclick="switchTab('data')">
+      <span class="tab-icon">💾</span>Data
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     OBRAZOVKA: PŘEHLED
+══════════════════════════════ -->
+<div id="screen-prehled" class="screen">
+  <div class="nav-bar">
+    <div class="nav-title">Přehled</div>
+    <div class="nav-subtitle">Posledních 14 dní</div>
+  </div>
+  <div class="content">
+    <div class="stats-grid" id="stats-grid"></div>
+    <div id="history-list"></div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item" onclick="switchTab('dnes')">
+      <span class="tab-icon">✓</span>Dnes
+    </button>
+    <button class="tab-item active" onclick="switchTab('prehled')">
+      <span class="tab-icon">📊</span>Přehled
+    </button>
+    <button class="tab-item" onclick="switchTab('sprava')">
+      <span class="tab-icon">✏️</span>Správa
+    </button>
+    <button class="tab-item" onclick="switchTab('data')">
+      <span class="tab-icon">💾</span>Data
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     OBRAZOVKA: SPRÁVA
+══════════════════════════════ -->
+<div id="screen-sprava" class="screen">
+  <div class="nav-bar">
+    <div class="nav-title">Správa návyků</div>
+  </div>
+  <div class="content">
+    <div class="input-row">
+      <input type="text" id="new-habit-input" placeholder="Nový návyk..." />
+      <button class="btn-add" onclick="addHabit()">Přidat</button>
+    </div>
+    <div id="manage-list"></div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item" onclick="switchTab('dnes')">
+      <span class="tab-icon">✓</span>Dnes
+    </button>
+    <button class="tab-item" onclick="switchTab('prehled')">
+      <span class="tab-icon">📊</span>Přehled
+    </button>
+    <button class="tab-item active" onclick="switchTab('sprava')">
+      <span class="tab-icon">✏️</span>Správa
+    </button>
+    <button class="tab-item" onclick="switchTab('data')">
+      <span class="tab-icon">💾</span>Data
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════
+     OBRAZOVKA: DATA
+══════════════════════════════ -->
+<div id="screen-data" class="screen">
+  <div class="nav-bar">
+    <div class="nav-title">Data</div>
+    <div class="nav-subtitle">Záloha a obnova</div>
+  </div>
+  <div class="content">
+
+    <div class="settings-section">
+      <div class="settings-label">Uložit data</div>
+      <div class="settings-card">
+        <div class="settings-row" onclick="exportData()">
+          <div>
+            <div class="settings-row-label">Exportovat zálohu</div>
+            <div class="settings-row-hint">Stáhne habits-zaloha.json</div>
+          </div>
+          <span class="settings-arrow">↓</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-label">Načíst data</div>
+      <div class="settings-card">
+        <div class="settings-row" onclick="document.getElementById('import-input').click()">
+          <div>
+            <div class="settings-row-label">Importovat zálohu</div>
+            <div class="settings-row-hint">Načte habits-zaloha.json</div>
+          </div>
+          <span class="settings-arrow">↑</span>
+        </div>
+      </div>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-label">Nebezpečná zóna</div>
+      <button class="btn-danger" onclick="resetData()">Smazat všechna data</button>
+    </div>
+
+    <div style="padding: 8px 4px;">
+      <p style="font-size: 13px; color: var(--muted); line-height: 1.6;">
+        Data jsou uložena v tomto prohlížeči. Exportuj zálohu před mazáním
+        historie prohlížeče nebo přeinstalací appky. Pro přenos na jiné
+        zařízení exportuj, přenés soubor a importuj.
+      </p>
+    </div>
+
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item" onclick="switchTab('dnes')">
+      <span class="tab-icon">✓</span>Dnes
+    </button>
+    <button class="tab-item" onclick="switchTab('prehled')">
+      <span class="tab-icon">📊</span>Přehled
+    </button>
+    <button class="tab-item" onclick="switchTab('sprava')">
+      <span class="tab-icon">✏️</span>Správa
+    </button>
+    <button class="tab-item active" onclick="switchTab('data')">
+      <span class="tab-icon">💾</span>Data
+    </button>
+  </div>
+</div>
+
+<!-- Banner pro potvrzení -->
+<div class="save-banner" id="save-banner"></div>
+
+<script>
+/* ════════════════════════════════════════
+   DATA
+════════════════════════════════════════ */
+const STORAGE_KEY = 'habit_tracker_v1';
+
+// Výchozí struktura — uprav návyky podle sebe
+const DEFAULT_DATA = {
+  habits: ['Meditace', 'Cvičení', 'Čtení'],
+  log: {}
+};
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+
+function saveData() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch(e) {
+    showBanner('Chyba při ukládání!');
+  }
+}
+
+let data = loadData();
+
+/* ════════════════════════════════════════
+   POMOCNÉ FUNKCE
+════════════════════════════════════════ */
+function todayKey() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function formatDateCZ(key) {
+  const [y, m, d] = key.split('-');
+  const days = ['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota'];
+  const date = new Date(y, m-1, d);
+  return `${days[date.getDay()]} ${parseInt(d)}. ${parseInt(m)}. ${y}`;
+}
+
+function getStreak(habit) {
+  let streak = 0;
+  const d = new Date();
+  // Začni od včerejška pokud dnes ještě není zaznamenáno
+  const today = todayKey();
+  const todayLog = data.log[today] || {};
+  if (!(habit in todayLog)) d.setDate(d.getDate() - 1);
+
+  while (true) {
+    const key = d.toISOString().split('T')[0];
+    if (data.log[key] && data.log[key][habit] === true) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    } else break;
+  }
+  return streak;
+}
+
+function showBanner(msg) {
+  const b = document.getElementById('save-banner');
+  b.textContent = msg;
+  b.classList.add('show');
+  setTimeout(() => b.classList.remove('show'), 2000);
+}
+
+/* ════════════════════════════════════════
+   NAVIGACE
+════════════════════════════════════════ */
+const TABS = ['dnes', 'prehled', 'sprava', 'data'];
+
+function switchTab(tab) {
+  TABS.forEach(t => {
+    document.getElementById('screen-' + t).classList.toggle('active', t === tab);
+    // Aktualizuj aktivní tab v každé tab-bar
+    document.querySelectorAll('.tab-item').forEach(el => {
+      if (el.getAttribute('onclick') === `switchTab('${t}')`) {
+        el.classList.toggle('active', t === tab);
+      }
+    });
+  });
+  if (tab === 'dnes')    renderDnes();
+  if (tab === 'prehled') renderPrehled();
+  if (tab === 'sprava')  renderSprava();
+}
+
+/* ════════════════════════════════════════
+   DNES
+════════════════════════════════════════ */
+function renderDnes() {
+  const today = todayKey();
+  if (!data.log[today]) data.log[today] = {};
+  const log = data.log[today];
+
+  // Datum v hlavičce
+  document.getElementById('dnes-datum').textContent = formatDateCZ(today);
+
+  const list = document.getElementById('dnes-list');
+
+  if (!data.habits.length) {
+    list.innerHTML = `<div class="empty">
+      <div class="empty-icon">📝</div>
+      Žádné návyky.<br>Přidej je ve správě.
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = data.habits.map(h => {
+    const state = log[h];
+    const yesClass = state === true  ? 'yes' : '';
+    const noClass  = state === false ? 'no'  : '';
+    const streak   = getStreak(h);
+    const streakTxt = streak > 0
+      ? `🔥 ${streak} ${streak === 1 ? 'den' : streak < 5 ? 'dny' : 'dní'} v řadě`
+      : 'Žádný streak';
+
+    return `<div class="habit-card">
+      <div class="habit-info">
+        <div class="habit-name">${h}</div>
+        <div class="habit-meta">${streakTxt}</div>
+      </div>
+      <div class="btn-group">
+        <button class="circle-btn ${yesClass}" onclick="toggle('${h}', true)"  title="Splněno">✓</button>
+        <button class="circle-btn ${noClass}"  onclick="toggle('${h}', false)" title="Nesplněno">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggle(habit, value) {
+  const today = todayKey();
+  if (!data.log[today]) data.log[today] = {};
+
+  // Druhé kliknutí na stejné tlačítko = zrušit výběr
+  if (data.log[today][habit] === value) {
+    delete data.log[today][habit];
+  } else {
+    data.log[today][habit] = value;
+  }
+  saveData();
+  renderDnes();
+}
+
+/* ════════════════════════════════════════
+   PŘEHLED
+════════════════════════════════════════ */
+function renderPrehled() {
+  // Celkové statistiky
+  let totalDone = 0, totalFail = 0;
+  Object.values(data.log).forEach(day => {
+    Object.values(day).forEach(v => v ? totalDone++ : totalFail++);
+  });
+  const total = totalDone + totalFail;
+  const pct = total > 0 ? Math.round(totalDone / total * 100) : 0;
+
+  // Nejlepší streak přes všechny návyky
+  const bestStreak = data.habits.length
+    ? Math.max(...data.habits.map(h => getStreak(h)))
+    : 0;
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card">
+      <div class="stat-num" style="color: var(--green)">${totalDone}</div>
+      <div class="stat-label">splněno</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">${pct}%</div>
+      <div class="stat-label">úspěšnost</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">🔥${bestStreak}</div>
+      <div class="stat-label">streak</div>
+    </div>
+  `;
+
+  // Historie posledních 14 dní
+  const keys = Object.keys(data.log).sort().reverse().slice(0, 14);
+  const hist = document.getElementById('history-list');
+
+  if (!keys.length) {
+    hist.innerHTML = `<div class="empty">
+      <div class="empty-icon">📅</div>
+      Zatím žádná historie.
+    </div>`;
+    return;
+  }
+
+  hist.innerHTML = `<div class="history-card">` +
+    keys.map(key => {
+      const day = data.log[key];
+      const pills = data.habits
+        .filter(h => h in day)
+        .map(h => `<span class="pill ${day[h] ? 'done' : 'fail'}">${h}</span>`)
+        .join('');
+      return `<div class="history-day">
+        <div class="history-date">${formatDateCZ(key)}</div>
+        <div class="history-pills">${pills || '<span style="color:var(--muted);font-size:12px">nic nezaznamenáno</span>'}</div>
+      </div>`;
+    }).join('') +
+  `</div>`;
+}
+
+/* ════════════════════════════════════════
+   SPRÁVA
+════════════════════════════════════════ */
+function renderSprava() {
+  const list = document.getElementById('manage-list');
+
+  if (!data.habits.length) {
+    list.innerHTML = `<div class="empty">
+      <div class="empty-icon">✏️</div>
+      Žádné návyky. Přidej první výše.
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = `<div class="manage-card">` +
+    data.habits.map(h => `
+      <div class="manage-row">
+        <span class="manage-name">${h}</span>
+        <button class="btn-delete" onclick="removeHabit('${h}')" title="Odebrat">×</button>
+      </div>`
+    ).join('') +
+  `</div>`;
+}
+
+function addHabit() {
+  const input = document.getElementById('new-habit-input');
+  const name = input.value.trim();
+  if (!name) return;
+  if (data.habits.includes(name)) { showBanner('Návyk již existuje'); return; }
+  data.habits.push(name);
+  saveData();
+  input.value = '';
+  renderSprava();
+  showBanner('Návyk přidán');
+}
+
+function removeHabit(name) {
+  if (!confirm(`Odebrat návyk "${name}"? Historie zůstane.`)) return;
+  data.habits = data.habits.filter(h => h !== name);
+  saveData();
+  renderSprava();
+  showBanner('Návyk odebrán');
+}
+
+/* ════════════════════════════════════════
+   EXPORT / IMPORT
+════════════════════════════════════════ */
+function exportData() {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'habits-zaloha.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showBanner('Záloha stažena');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      // Základní validace
+      if (!imported.habits || !imported.log) throw new Error('Neplatný formát');
+      data = imported;
+      saveData();
+      renderDnes();
+      showBanner('Data načtena');
+      switchTab('dnes');
+    } catch(err) {
+      showBanner('Chyba: neplatný soubor');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // Reset pro opakovaný import
+}
+
+function resetData() {
+  if (!confirm('Opravdu smazat VŠECHNA data? Tato akce je nevratná.')) return;
+  data = JSON.parse(JSON.stringify(DEFAULT_DATA));
+  saveData();
+  renderDnes();
+  switchTab('dnes');
+  showBanner('Data smazána');
+}
+
+/* ════════════════════════════════════════
+   INICIALIZACE
+════════════════════════════════════════ */
+document.getElementById('new-habit-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addHabit();
+});
+
+renderDnes();
+</script>
+</body>
+</html>
