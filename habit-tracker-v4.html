@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+  <meta name="apple-mobile-web-app-title" content="Návyky"/>
+  <title>Návyky</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#f2f2f7;--surface:#fff;--surface2:#f2f2f7;
+      --border:rgba(0,0,0,0.08);--text:#1c1c1e;--muted:#8e8e93;
+      --radius:14px;--blue:#007aff;
+      --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+    }
+    @media(prefers-color-scheme:dark){
+      :root{--bg:#000;--surface:#1c1c1e;--surface2:#2c2c2e;--border:rgba(255,255,255,0.08);--text:#f5f5f7}
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;-webkit-font-smoothing:antialiased;padding-top:var(--safe-top)}
+
+    /* ── Screens ── */
+    .screen{display:none;flex-direction:column;height:100dvh}
+    .screen.active{display:flex}
+    .nav-bar{padding:16px 20px 8px;background:var(--bg);flex-shrink:0}
+    .nav-bar-row{display:flex;align-items:flex-end;justify-content:space-between}
+    .nav-title{font-size:28px;font-weight:700;letter-spacing:-0.5px}
+    .nav-sub{font-size:14px;color:var(--muted);margin-top:2px}
+    .content{flex:1;overflow-y:auto;padding:12px 16px calc(80px + var(--safe-bot))}
+
+    /* ── Tab bar ── */
+    .tab-bar{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--surface);border-top:0.5px solid var(--border);padding-bottom:var(--safe-bot);z-index:100}
+    .tab-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0 6px;gap:3px;cursor:pointer;border:none;background:none;color:var(--muted);font-size:10px;font-weight:500;-webkit-tap-highlight-color:transparent}
+    .tab-item.active{color:var(--blue)}
+    .tab-icon{width:24px;height:24px;display:block}
+    .tab-icon svg{width:24px;height:24px}
+
+    /* ── Date picker ── */
+    .date-picker-row{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+    .date-nav-btn{width:32px;height:32px;border-radius:50%;border:0.5px solid var(--border);background:var(--surface);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;-webkit-tap-highlight-color:transparent}
+    .date-label{flex:1;text-align:center;font-size:15px;font-weight:500;color:var(--text)}
+    .date-today-btn{padding:5px 12px;border-radius:20px;border:0.5px solid var(--blue);background:transparent;color:var(--blue);font-size:13px;font-weight:500;cursor:pointer;-webkit-tap-highlight-color:transparent}
+
+    /* ── Habit cards ── */
+    .habit-card{background:var(--surface);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px}
+    .habit-icon-badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+    .habit-info{flex:1;min-width:0}
+    .habit-name{font-size:16px;font-weight:500}
+    .habit-meta{font-size:12px;color:var(--muted);margin-top:2px}
+    .progress-bar-wrap{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+    .progress-bar-fill{height:100%;border-radius:2px;transition:width 0.3s}
+    .action-row{display:flex;gap:6px;flex-shrink:0}
+    .action-btn{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;-webkit-tap-highlight-color:transparent;transition:transform 0.1s;color:var(--muted)}
+    .action-btn:active{transform:scale(0.9)}
+    .action-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+    .action-btn.active-yes{background:#e8f8ed;border-color:#34c759;color:#34c759}
+    .action-btn.active-no{background:#fff0ef;border-color:#ff3b30;color:#ff3b30}
+    .action-btn.active-skip{background:#fff9ec;border-color:#ff9500;color:#ff9500}
+    .action-btn.active-note{background:#f0f0ff;border-color:#5856d6;color:#5856d6}
+    .has-note-dot{width:6px;height:6px;border-radius:50%;background:#5856d6;position:absolute;top:2px;right:2px}
+
+    /* ── Modals ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:none;align-items:flex-end;justify-content:center;z-index:200;padding-bottom:var(--safe-bot)}
+    .modal-overlay.open{display:flex}
+    .modal-sheet{background:var(--surface);border-radius:20px 20px 0 0;padding:20px;width:100%;max-width:500px;max-height:85dvh;overflow-y:auto}
+    .modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+    .modal-title{font-size:17px;font-weight:600;margin-bottom:16px}
+    .modal-label{font-size:13px;color:var(--muted);font-weight:500;margin-bottom:6px;margin-top:14px}
+    .modal-input{width:100%;padding:12px 14px;background:var(--surface2);border:0.5px solid var(--border);border-radius:10px;color:var(--text);font-size:16px;outline:none;font-family:inherit}
+    .modal-textarea{width:100%;padding:12px;border-radius:10px;border:0.5px solid var(--border);background:var(--surface2);color:var(--text);font-size:15px;resize:none;height:100px;font-family:inherit;outline:none}
+    .modal-btns{display:flex;gap:10px;margin-top:16px}
+    .modal-btn{flex:1;padding:13px;border-radius:12px;border:none;font-size:15px;font-weight:600;cursor:pointer}
+    .modal-btn.cancel{background:var(--surface2);color:var(--text)}
+    .modal-btn.save{background:var(--blue);color:white}
+
+    /* ── Color / icon pickers ── */
+    .color-grid{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+    .color-swatch{width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:transform 0.1s;position:relative;-webkit-tap-highlight-color:transparent}
+    .color-swatch.selected{border-color:var(--text);transform:scale(1.15)}
+    .color-swatch.selected::after{content:'';position:absolute;inset:0;border-radius:50%;border:2px solid white}
+    .icon-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+    .icon-btn{width:44px;height:44px;border-radius:12px;border:1.5px solid var(--border);background:var(--surface2);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+    .icon-btn.selected{border-color:var(--blue);background:#e8f0ff}
+    .icon-input-row{display:flex;gap:8px;margin-top:8px}
+    .icon-custom-input{flex:1;padding:10px 14px;background:var(--surface2);border:0.5px solid var(--border);border-radius:10px;color:var(--text);font-size:22px;outline:none;text-align:center}
+    .icon-custom-btn{padding:10px 16px;background:var(--blue);color:white;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}
+
+    /* ── Stats / přehled ── */
+    .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+    .stat-card{background:var(--surface);border-radius:var(--radius);padding:16px;text-align:center}
+    .stat-num{font-size:28px;font-weight:700}
+    .stat-label{font-size:12px;color:var(--muted);margin-top:3px}
+    .period-selector{display:flex;background:var(--surface2);border-radius:10px;padding:3px;margin-bottom:16px}
+    .period-btn{flex:1;padding:7px;border:none;background:transparent;border-radius:8px;font-size:14px;font-weight:500;color:var(--muted);cursor:pointer}
+    .period-btn.active{background:var(--surface);color:var(--text)}
+    .chart-wrap{background:var(--surface);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+    .chart-title{font-size:14px;font-weight:500;margin-bottom:12px;color:var(--muted)}
+    canvas{width:100%!important}
+
+    /* ── Habit stat cards (přehled) ── */
+    .habit-stat-card{background:var(--surface);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px;cursor:pointer}
+    .habit-stat-header{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+    .habit-stat-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+    .habit-stat-name{font-size:15px;font-weight:500;flex:1}
+    .habit-stat-pct{font-size:20px;font-weight:700}
+    .habit-stat-bars{display:flex;gap:3px;margin-bottom:8px}
+    .day-bar{flex:1;height:32px;border-radius:4px;position:relative}
+    .day-bar-fill{position:absolute;bottom:0;left:0;right:0;border-radius:4px}
+    .habit-stat-meta{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+
+    /* ── Detail sheet (poznámky v přehledu) ── */
+    .detail-day-row{padding:12px 0;border-bottom:0.5px solid var(--border)}
+    .detail-day-row:last-child{border-bottom:none}
+    .detail-day-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+    .detail-state-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .detail-day-date{font-size:14px;font-weight:500}
+    .detail-day-note{font-size:13px;color:var(--muted);margin-top:3px;padding-left:18px;line-height:1.5}
+
+    /* ── Správa ── */
+    .input-row{display:flex;gap:10px;margin-bottom:16px}
+    .input-row input{flex:1;padding:12px 14px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:16px;outline:none;-webkit-appearance:none}
+    .input-row input::placeholder{color:var(--muted)}
+    .btn-add{padding:12px 18px;background:var(--blue);color:white;border:none;border-radius:var(--radius);font-size:15px;font-weight:600;cursor:pointer}
+    .manage-card{background:var(--surface);border-radius:var(--radius);overflow:hidden;margin-bottom:10px}
+    .manage-row{display:flex;align-items:center;padding:12px 16px;border-bottom:0.5px solid var(--border);gap:10px;touch-action:none;user-select:none}
+    .manage-row:last-child{border-bottom:none}
+    .manage-row.dragging{opacity:0.4}
+    .manage-row.drag-over{border-top:2px solid var(--blue)}
+    .drag-handle{color:var(--muted);padding:0 4px;cursor:grab;display:flex;align-items:center}
+    .drag-handle svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+    .manage-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+    .manage-name{flex:1;font-size:15px}
+    .btn-edit{padding:6px 12px;border-radius:8px;border:0.5px solid var(--border);background:transparent;color:var(--blue);font-size:13px;cursor:pointer}
+    .btn-del{width:28px;height:28px;border-radius:50%;border:0.5px solid var(--border);background:transparent;color:#ff3b30;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+    /* ── Data screen ── */
+    .section-label{font-size:13px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:0.5px;padding:0 4px;margin-bottom:8px}
+    .data-card{background:var(--surface);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+    .data-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:0.5px solid var(--border);cursor:pointer;-webkit-tap-highlight-color:transparent}
+    .data-row:last-child{border-bottom:none}
+    .data-row-title{font-size:16px}
+    .data-row-hint{font-size:13px;color:var(--muted);margin-top:2px}
+    .data-arrow{color:var(--muted);font-size:18px}
+    .btn-danger{width:100%;padding:15px;background:#fff0ef;color:#ff3b30;border:none;border-radius:var(--radius);font-size:16px;font-weight:600;cursor:pointer}
+
+    /* ── Manuál ── */
+    .manual-section{margin-bottom:20px}
+    .manual-section h3{font-size:16px;font-weight:600;margin-bottom:8px;color:var(--text)}
+    .manual-section p,.manual-section li{font-size:14px;color:var(--muted);line-height:1.7}
+    .manual-section ul{padding-left:16px}
+    .manual-section li{margin-bottom:4px}
+
+    /* ── Banner ── */
+    .banner{position:fixed;bottom:calc(72px + var(--safe-bot));left:50%;transform:translateX(-50%) translateY(10px);background:#1c1c1e;color:white;padding:10px 20px;border-radius:20px;font-size:14px;font-weight:500;opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;white-space:nowrap;z-index:300}
+    .banner.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .empty{text-align:center;padding:48px 24px;color:var(--muted);font-size:15px;line-height:1.6}
+    .empty-icon{font-size:40px;margin-bottom:12px}
+  </style>
+</head>
+<body>
+
+<!-- ══ NOTE MODAL ══ -->
+<div class="modal-overlay" id="note-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="note-modal-title">Poznámka</div>
+    <textarea class="modal-textarea" id="note-textarea" placeholder="Napiš poznámku..."></textarea>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeNoteModal()">Zrušit</button>
+      <button class="modal-btn save" onclick="saveNote()">Uložit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ EDIT MODAL ══ -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="edit-modal-title">Upravit návyk</div>
+    <div class="modal-label">Název</div>
+    <input class="modal-input" id="edit-name-input" type="text"/>
+    <div class="modal-label">Cíl (počet dní)</div>
+    <input class="modal-input" id="edit-goal-input" type="number" min="1" max="365"/>
+    <div class="modal-label">Streak — kolikrát týdně se počítá jako splněno</div>
+    <input class="modal-input" id="edit-freq-input" type="number" min="1" max="7" placeholder="7 = každý den"/>
+    <div class="modal-label">Barva</div>
+    <div class="color-grid" id="edit-color-grid"></div>
+    <div class="modal-label">Ikona — vyber nebo zadej vlastní emoji</div>
+    <div class="icon-grid" id="edit-icon-grid"></div>
+    <div class="icon-input-row">
+      <input class="icon-custom-input" id="icon-custom-input" placeholder="✍️" maxlength="2"/>
+      <button class="icon-custom-btn" onclick="selectCustomIcon()">Použít</button>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" onclick="closeEditModal()">Zrušit</button>
+      <button class="modal-btn save" onclick="saveEdit()">Uložit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DETAIL MODAL (přehled poznámek) ══ -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="detail-modal-title">Historie</div>
+    <div id="detail-modal-content"></div>
+    <div class="modal-btns">
+      <button class="modal-btn cancel" style="flex:none;width:100%" onclick="closeDetailModal()">Zavřít</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SCREEN: NÁVYKY ══ -->
+<div id="screen-dnes" class="screen active">
+  <div class="nav-bar">
+    <div class="nav-title">Návyky</div>
+    <div style="margin-top:10px">
+      <div class="date-picker-row">
+        <button class="date-nav-btn" onclick="changeDay(-1)">‹</button>
+        <div class="date-label" id="dnes-datum"></div>
+        <button class="date-nav-btn" onclick="changeDay(1)">›</button>
+        <button class="date-today-btn" id="today-btn" onclick="goToday()">Dnes</button>
+      </div>
+    </div>
+  </div>
+  <div class="content" id="dnes-list"></div>
+  <div class="tab-bar">
+    <button class="tab-item active" onclick="switchTab('dnes')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Návyky</button>
+    <button class="tab-item" onclick="switchTab('prehled')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg></span>Přehled</button>
+    <button class="tab-item" onclick="switchTab('sprava')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Správa</button>
+    <button class="tab-item" onclick="switchTab('data')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>Data</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN: PŘEHLED ══ -->
+<div id="screen-prehled" class="screen">
+  <div class="nav-bar"><div class="nav-title">Přehled</div></div>
+  <div class="content">
+    <div class="period-selector">
+      <button class="period-btn active" onclick="setPeriod('week')">Týden</button>
+      <button class="period-btn" onclick="setPeriod('month')">Měsíc</button>
+    </div>
+    <div id="habit-stats-list"></div>
+    <div class="chart-wrap">
+      <div class="chart-title">Úspěšnost v čase</div>
+      <canvas id="line-chart" height="160"></canvas>
+    </div>
+    <div class="stats-grid" id="stats-grid"></div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item" onclick="switchTab('dnes')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Návyky</button>
+    <button class="tab-item active" onclick="switchTab('prehled')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg></span>Přehled</button>
+    <button class="tab-item" onclick="switchTab('sprava')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Správa</button>
+    <button class="tab-item" onclick="switchTab('data')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>Data</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN: SPRÁVA ══ -->
+<div id="screen-sprava" class="screen">
+  <div class="nav-bar"><div class="nav-title">Správa</div></div>
+  <div class="content">
+    <div class="input-row">
+      <input type="text" id="new-habit-input" placeholder="Nový návyk..."/>
+      <button class="btn-add" onclick="addHabit()">Přidat</button>
+    </div>
+    <div id="manage-list"></div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item" onclick="switchTab('dnes')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Návyky</button>
+    <button class="tab-item" onclick="switchTab('prehled')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg></span>Přehled</button>
+    <button class="tab-item active" onclick="switchTab('sprava')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Správa</button>
+    <button class="tab-item" onclick="switchTab('data')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>Data</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN: DATA ══ -->
+<div id="screen-data" class="screen">
+  <div class="nav-bar"><div class="nav-title">Data</div><div class="nav-sub">Záloha a nastavení</div></div>
+  <div class="content">
+    <div class="section-label">Záloha</div>
+    <div class="data-card">
+      <div class="data-row" onclick="exportData()">
+        <div><div class="data-row-title">Exportovat zálohu</div><div class="data-row-hint">Stáhne habits-zaloha.json</div></div>
+        <span class="data-arrow">↓</span>
+      </div>
+      <div class="data-row" onclick="document.getElementById('import-input').click()">
+        <div><div class="data-row-title">Importovat zálohu</div><div class="data-row-hint">Načte habits-zaloha.json</div></div>
+        <span class="data-arrow">↑</span>
+      </div>
+    </div>
+    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)"/>
+    <div class="section-label">Nápověda</div>
+    <div class="data-card">
+      <div class="data-row" onclick="switchTab('manual')">
+        <div><div class="data-row-title">Jak používat appku</div><div class="data-row-hint">Průvodce funkcemi</div></div>
+        <span class="data-arrow">›</span>
+      </div>
+    </div>
+    <div class="section-label">Nebezpečná zóna</div>
+    <button class="btn-danger" onclick="resetData()">Smazat všechna data</button>
+    <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-top:16px;padding:0 4px">Data jsou uložena lokálně v Safari. Exportuj zálohu před mazáním historie prohlížeče.</p>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item" onclick="switchTab('dnes')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Návyky</button>
+    <button class="tab-item" onclick="switchTab('prehled')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="3" width="4" height="18"/><rect x="10" y="8" width="4" height="13"/><rect x="2" y="13" width="4" height="8"/></svg></span>Přehled</button>
+    <button class="tab-item" onclick="switchTab('sprava')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>Správa</button>
+    <button class="tab-item active" onclick="switchTab('data')"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>Data</button>
+  </div>
+</div>
+
+<!-- ══ SCREEN: MANUÁL ══ -->
+<div id="screen-manual" class="screen">
+  <div class="nav-bar">
+    <div class="nav-bar-row">
+      <div class="nav-title">Průvodce</div>
+      <button onclick="switchTab('data')" style="background:none;border:none;color:var(--blue);font-size:15px;cursor:pointer;padding:4px">← Zpět</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="manual-section">
+      <h3>Záložka Návyky</h3>
+      <p>Hlavní obrazovka pro denní zaznamenávání. Pomocí šipek ‹ › můžeš procházet minulé dny a doplnit záznamy zpětně. Tlačítko Dnes tě vrátí na dnešek.</p>
+      <ul>
+        <li>✓ Splněno — počítá se do progressu i streaku</li>
+        <li>✕ Nesplněno — počítá se jako selhání</li>
+        <li>» Vynecháno — nezapočítá se (nemoc, dovolená)</li>
+        <li>✎ Poznámka — přidej komentář k jakémukoli stavu</li>
+      </ul>
+    </div>
+    <div class="manual-section">
+      <h3>Záložka Přehled</h3>
+      <p>Statistiky za týden nebo měsíc. Kliknutím na kartu návyku zobrazíš detailní historii včetně všech poznámek — ideální pro zjištění proč jsi vynechal. Grafy ukazují úspěšnost v čase.</p>
+    </div>
+    <div class="manual-section">
+      <h3>Záložka Správa</h3>
+      <p>Přidávání, úprava a mazání návyků. Pořadí měníš přetažením za ikonu ≡ vlevo. Při úpravě každého návyku nastavíš:</p>
+      <ul>
+        <li>Název a ikonu (vyber z nabídky nebo zadej vlastní emoji)</li>
+        <li>Barvu</li>
+        <li>Cíl v počtu dní (výchozí 66)</li>
+        <li>Kolikrát týdně se počítá jako streak (např. 3× = stačí 3 dny ze 7)</li>
+      </ul>
+    </div>
+    <div class="manual-section">
+      <h3>Záložka Data</h3>
+      <p>Záloha a obnova dat. Exportuj zálohu před mazáním historie Safari — jinak přijdeš o data. Import obnoví vše přesně jak bylo.</p>
+    </div>
+    <div class="manual-section">
+      <h3>Progress bar</h3>
+      <p>Zobrazuje kolik ze stanoveného cíle (výchozí 66 dní) jsi splnil celkově — ne nutně v řadě. 66 dní je vědecky ověřený průměr pro vytvoření návyku.</p>
+    </div>
+    <div class="manual-section">
+      <h3>Streak</h3>
+      <p>Počítá se podle nastavení frekvence. Při 7×/týden musíš splnit každý den. Při 3×/týden stačí 3 dny ze 7 — streak se nepřeruší pokud splníš alespoň nastavenou frekvenci.</p>
+    </div>
+  </div>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const STORAGE_KEY = 'habit_tracker_v2';
+const GOAL_DAYS = 66;
+
+const COLORS = [
+  {name:'Modrá',hex:'#007aff'},{name:'Zelená',hex:'#34c759'},{name:'Červená',hex:'#ff3b30'},
+  {name:'Oranžová',hex:'#ff9500'},{name:'Fialová',hex:'#5856d6'},{name:'Růžová',hex:'#ff2d55'},
+  {name:'Tyrkysová',hex:'#5ac8fa'},{name:'Žlutá',hex:'#ffcc00'},{name:'Hnědá',hex:'#a2845e'},{name:'Šedá',hex:'#8e8e93'},
+];
+
+const ICONS = ['⭐','🏃','📚','🧘','💪','🥗','💧','🎯','🌿','✍️'];
+
+const DEFAULT_DATA = {
+  habits:[
+    {id:1,name:'Meditace',color:'#5856d6',icon:'🧘',goalDays:66,weekFreq:7},
+    {id:2,name:'Cvičení',color:'#34c759',icon:'💪',goalDays:66,weekFreq:3},
+    {id:3,name:'Čtení',color:'#007aff',icon:'📚',goalDays:66,weekFreq:7},
+  ],
+  log:{}
+};
+
+/* ── Data ── */
+function loadData(){try{const r=localStorage.getItem(STORAGE_KEY);if(r)return JSON.parse(r);}catch(e){}return JSON.parse(JSON.stringify(DEFAULT_DATA));}
+function saveData(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}catch(e){showBanner('Chyba ukládání!');}}
+let data=loadData();
+let nextId=data.habits.length?Math.max(...data.habits.map(h=>h.id))+1:1;
+
+/* ── Helpers ── */
+function todayKey(){return new Date().toISOString().split('T')[0];}
+function dateKey(d){return d.toISOString().split('T')[0];}
+function addDays(date,n){const d=new Date(date);d.setDate(d.getDate()+n);return d;}
+function hexToRgb(hex){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return `${r},${g},${b}`;}
+
+function formatFullCZ(key){
+  const[y,m,d]=key.split('-');
+  const days=['neděle','pondělí','úterý','středa','čtvrtek','pátek','sobota'];
+  const date=new Date(y,m-1,d);
+  return `${days[date.getDay()]} ${parseInt(d)}. ${parseInt(m)}. ${y}`;
+}
+function formatShortCZ(key){
+  const[y,m,d]=key.split('-');
+  const days=['Ne','Po','Út','St','Čt','Pá','So'];
+  const date=new Date(y,m-1,d);
+  return `${days[date.getDay()]} ${parseInt(d)}. ${parseInt(m)}.`;
+}
+
+function getStreak(habit){
+  const freq=habit.weekFreq||7;
+  if(freq>=7){
+    // denní streak
+    let streak=0;const d=new Date();const today=todayKey();
+    const tl=data.log[today]||{};
+    if(tl[habit.id]!=='yes')d.setDate(d.getDate()-1);
+    while(true){const key=dateKey(d);if(data.log[key]&&data.log[key][habit.id]==='yes'){streak++;d.setDate(d.getDate()-1);}else break;}
+    return streak;
+  } else {
+    // týdenní streak — počítej týdny kde splnil >= freq dní
+    let streak=0;const today=new Date();
+    for(let w=0;w<52;w++){
+      const weekStart=addDays(today,-(today.getDay()||7)+1-w*7);
+      let doneThisWeek=0;
+      for(let d=0;d<7;d++){
+        const key=dateKey(addDays(weekStart,d));
+        if(data.log[key]&&data.log[key][habit.id]==='yes')doneThisWeek++;
+      }
+      if(doneThisWeek>=freq)streak++;
+      else if(w>0)break;
+    }
+    return streak;
+  }
+}
+
+function getDoneCount(habit){return Object.values(data.log).filter(day=>day[habit.id]==='yes').length;}
+function getPct(habit,keys){
+  const counted=keys.filter(k=>data.log[k]&&(data.log[k][habit.id]==='yes'||data.log[k][habit.id]==='no'));
+  if(!counted.length)return 0;
+  return Math.round(counted.filter(k=>data.log[k][habit.id]==='yes').length/counted.length*100);
+}
+
+function showBanner(msg){const b=document.getElementById('banner');b.textContent=msg;b.classList.add('show');setTimeout(()=>b.classList.remove('show'),2000);}
+
+function getPeriodKeys(){
+  const keys=[];const today=new Date();const n=currentPeriod==='week'?7:30;
+  for(let i=n-1;i>=0;i--)keys.push(dateKey(addDays(today,-i)));
+  return keys;
+}
+
+/* ── Navigation ── */
+const TABS=['dnes','prehled','sprava','data','manual'];
+let currentPeriod='week';
+let lineChart=null;
+let currentDateOffset=0;
+
+function switchTab(tab){
+  TABS.forEach(t=>{
+    const el=document.getElementById('screen-'+t);
+    if(el)el.classList.toggle('active',t===tab);
+  });
+  document.querySelectorAll('.tab-item').forEach(el=>{
+    const fn=el.getAttribute('onclick')||'';
+    el.classList.toggle('active',fn.includes(`'${tab}'`));
+  });
+  if(tab==='dnes')renderDnes();
+  if(tab==='prehled')renderPrehled();
+  if(tab==='sprava')renderSprava();
+}
+
+/* ── Date navigation ── */
+function changeDay(delta){
+  currentDateOffset+=delta;
+  if(currentDateOffset>0)currentDateOffset=0;
+  renderDnes();
+}
+function goToday(){currentDateOffset=0;renderDnes();}
+
+function getCurrentKey(){
+  return dateKey(addDays(new Date(),currentDateOffset));
+}
+
+/* ── DNES ── */
+function renderDnes(){
+  const key=getCurrentKey();
+  if(!data.log[key])data.log[key]={};
+  const log=data.log[key];
+  const isToday=currentDateOffset===0;
+
+  // datum label
+  document.getElementById('dnes-datum').textContent=isToday?'Dnes, '+formatShortCZ(key):formatFullCZ(key);
+  const todayBtn=document.getElementById('today-btn');
+  todayBtn.style.display=isToday?'none':'block';
+
+  const list=document.getElementById('dnes-list');
+  if(!data.habits.length){
+    list.innerHTML=`<div class="empty"><div class="empty-icon">📝</div>Žádné návyky.<br>Přidej je ve správě.</div>`;
+    return;
+  }
+
+  list.innerHTML=data.habits.map(h=>{
+    const state=log[h.id]||null;
+    const hasNote=!!(log[h.id+'_note']);
+    const streak=getStreak(h);
+    const done=getDoneCount(h);
+    const goal=h.goalDays||GOAL_DAYS;
+    const freq=h.weekFreq||7;
+    const pct=Math.min(100,Math.round(done/goal*100));
+    const streakTxt=streak>0?`🔥 ${streak} ${freq<7?'týdnů':'dní'} v řadě`:'Zatím žádný streak';
+    const progressTxt=`${done} / ${goal} dní (${pct}%)`;
+
+    // SVG ikony tlačítek
+    const svgCheck=`<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>`;
+    const svgX=`<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    const svgSkip=`<svg viewBox="0 0 24 24"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg>`;
+    const svgNote=`<svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+
+    return `<div class="habit-card">
+      <div class="habit-icon-badge" style="background:${h.color}22">${h.icon}</div>
+      <div class="habit-info">
+        <div class="habit-name">${h.name}</div>
+        <div class="habit-meta">${streakTxt} · ${progressTxt}</div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%;background:${h.color}"></div></div>
+      </div>
+      <div class="action-row">
+        <button class="action-btn ${state==='yes'?'active-yes':''}" onclick="setLog(${h.id},'yes')" title="Splněno">${svgCheck}</button>
+        <button class="action-btn ${state==='no'?'active-no':''}" onclick="setLog(${h.id},'no')" title="Nesplněno">${svgX}</button>
+        <button class="action-btn ${state==='skip'?'active-skip':''}" onclick="setLog(${h.id},'skip')" title="Vynecháno">${svgSkip}</button>
+        <button class="action-btn ${hasNote?'active-note':''}" onclick="openNoteModal(${h.id})" title="Poznámka" style="position:relative">${svgNote}${hasNote?'<span class="has-note-dot"></span>':''}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function setLog(habitId,value){
+  const key=getCurrentKey();
+  if(!data.log[key])data.log[key]={};
+  data.log[key][habitId]=data.log[key][habitId]===value?undefined:value;
+  if(data.log[key][habitId]===undefined)delete data.log[key][habitId];
+  saveData();renderDnes();
+}
+
+/* ── Note modal ── */
+let noteHabitId=null;
+function openNoteModal(habitId){
+  noteHabitId=habitId;
+  const key=getCurrentKey();
+  const log=data.log[key]||{};
+  const habit=data.habits.find(h=>h.id===habitId);
+  document.getElementById('note-modal-title').textContent=habit?habit.name:'Poznámka';
+  document.getElementById('note-textarea').value=log[habitId+'_note']||'';
+  document.getElementById('note-modal').classList.add('open');
+}
+function closeNoteModal(){document.getElementById('note-modal').classList.remove('open');noteHabitId=null;}
+function saveNote(){
+  const key=getCurrentKey();
+  if(!data.log[key])data.log[key]={};
+  const txt=document.getElementById('note-textarea').value.trim();
+  if(txt)data.log[key][noteHabitId+'_note']=txt;
+  else delete data.log[key][noteHabitId+'_note'];
+  saveData();closeNoteModal();renderDnes();showBanner('Poznámka uložena');
+}
+
+/* ── PŘEHLED ── */
+function setPeriod(p){
+  currentPeriod=p;
+  document.querySelectorAll('.period-btn').forEach(b=>b.classList.toggle('active',b.getAttribute('onclick').includes(`'${p}'`)));
+  renderPrehled();
+}
+
+function renderPrehled(){
+  const keys=getPeriodKeys();
+  let totalDone=0,totalFail=0,totalSkip=0;
+  keys.forEach(k=>{if(!data.log[k])return;data.habits.forEach(h=>{const v=data.log[k][h.id];if(v==='yes')totalDone++;else if(v==='no')totalFail++;else if(v==='skip')totalSkip++;});});
+  const counted=totalDone+totalFail;
+  const pct=counted>0?Math.round(totalDone/counted*100):0;
+  const bestStreak=data.habits.length?Math.max(...data.habits.map(h=>getStreak(h))):0;
+
+  // Habit stat cards nahoře (klikatelné)
+  const statsList=document.getElementById('habit-stats-list');
+  if(!data.habits.length){statsList.innerHTML='';return;}
+  statsList.innerHTML=data.habits.map(h=>{
+    const hpct=getPct(h,keys);
+    const done=getDoneCount(h);
+    const goal=h.goalDays||GOAL_DAYS;
+    const progress=Math.min(100,Math.round(done/goal*100));
+    const bars=keys.slice(-14).map(k=>{
+      const v=data.log[k]?data.log[k][h.id]:null;
+      const color=v==='yes'?h.color:v==='no'?'#ff3b30':v==='skip'?'#ff9500':'var(--border)';
+      const height=v==='yes'?'100':v==='no'?'60':v==='skip'?'30':'8';
+      return `<div class="day-bar" style="background:${color}22"><div class="day-bar-fill" style="height:${height}%;background:${color}"></div></div>`;
+    }).join('');
+    return `<div class="habit-stat-card" onclick="openDetailModal(${h.id})">
+      <div class="habit-stat-header">
+        <div class="habit-stat-icon" style="background:${h.color}22">${h.icon}</div>
+        <div class="habit-stat-name">${h.name}</div>
+        <div class="habit-stat-pct" style="color:${h.color}">${hpct}%</div>
+      </div>
+      <div class="habit-stat-bars">${bars}</div>
+      <div class="habit-stat-meta"><span>Progress: ${done}/${goal}</span><span>Streak: ${getStreak(h)}</span></div>
+      <div class="progress-bar-wrap" style="margin-top:8px;height:4px"><div class="progress-bar-fill" style="width:${progress}%;background:${h.color}"></div></div>
+    </div>`;
+  }).join('');
+
+  // Čárový graf
+  renderLineChart(keys);
+
+  // Statistiky dole
+  document.getElementById('stats-grid').innerHTML=`
+    <div class="stat-card"><div class="stat-num" style="color:#34c759">${totalDone}</div><div class="stat-label">splněno</div></div>
+    <div class="stat-card"><div class="stat-num">${pct}%</div><div class="stat-label">úspěšnost</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:#ff9500">🔥${bestStreak}</div><div class="stat-label">streak</div></div>
+    <div class="stat-card"><div class="stat-num" style="color:var(--muted)">${totalSkip}</div><div class="stat-label">vynecháno</div></div>`;
+}
+
+function renderLineChart(keys){
+  const ctx=document.getElementById('line-chart').getContext('2d');
+  if(lineChart){lineChart.destroy();lineChart=null;}
+  const labels=keys.map(k=>formatShortCZ(k));
+  const datasets=data.habits.map(h=>({
+    label:h.name,
+    data:keys.map(k=>{const v=data.log[k]?data.log[k][h.id]:null;return v==='yes'?1:v==='no'?0:null;}),
+    borderColor:h.color,backgroundColor:`rgba(${hexToRgb(h.color)},0.08)`,
+    borderWidth:2,pointRadius:3,tension:0.3,spanGaps:true,fill:true,
+  }));
+  lineChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
+    responsive:true,
+    plugins:{legend:{display:data.habits.length>1,labels:{color:'#8e8e93',boxWidth:10,font:{size:11}}}},
+    scales:{
+      x:{ticks:{color:'#8e8e93',font:{size:10},maxRotation:0},grid:{display:false}},
+      y:{min:0,max:1,ticks:{color:'#8e8e93',font:{size:10},callback:v=>v===1?'✓':v===0?'✕':''},grid:{color:'rgba(128,128,128,0.1)'}}
+    }
+  }});
+}
+
+/* ── Detail modal (poznámky) ── */
+function openDetailModal(habitId){
+  const h=data.habits.find(h=>h.id===habitId);
+  if(!h)return;
+  document.getElementById('detail-modal-title').textContent=`${h.icon} ${h.name}`;
+  const allKeys=Object.keys(data.log).sort().reverse().slice(0,60);
+  const stateColors={'yes':'#34c759','no':'#ff3b30','skip':'#ff9500'};
+  const stateLabels={'yes':'Splněno','no':'Nesplněno','skip':'Vynecháno'};
+  const rows=allKeys.map(k=>{
+    const day=data.log[k]||{};
+    const v=day[habitId];
+    const note=day[habitId+'_note'];
+    if(!v&&!note)return '';
+    const color=stateColors[v]||'var(--muted)';
+    const label=stateLabels[v]||'—';
+    return `<div class="detail-day-row">
+      <div class="detail-day-header">
+        <div class="detail-state-dot" style="background:${color}"></div>
+        <div class="detail-day-date">${formatFullCZ(k)} — <span style="color:${color}">${label}</span></div>
+      </div>
+      ${note?`<div class="detail-day-note">${note}</div>`:''}
+    </div>`;
+  }).filter(Boolean).join('');
+  document.getElementById('detail-modal-content').innerHTML=rows||'<p style="color:var(--muted);font-size:14px;padding:16px 0">Zatím žádné záznamy.</p>';
+  document.getElementById('detail-modal').classList.add('open');
+}
+function closeDetailModal(){document.getElementById('detail-modal').classList.remove('open');}
+
+/* ── SPRÁVA ── */
+function renderSprava(){
+  const list=document.getElementById('manage-list');
+  if(!data.habits.length){list.innerHTML=`<div class="empty"><div class="empty-icon">✏️</div>Žádné návyky. Přidej první výše.</div>`;return;}
+  const dragHandleSVG=`<svg viewBox="0 0 16 16" stroke-width="1.5"><line x1="2" y1="4" x2="14" y2="4"/><line x1="2" y1="8" x2="14" y2="8"/><line x1="2" y1="12" x2="14" y2="12"/></svg>`;
+  list.innerHTML=`<div class="manage-card" id="sortable-list">`+
+    data.habits.map(h=>`
+      <div class="manage-row" data-id="${h.id}">
+        <span class="drag-handle">${dragHandleSVG}</span>
+        <div class="manage-icon" style="background:${h.color}22">${h.icon}</div>
+        <span class="manage-name">${h.name}</span>
+        <button class="btn-edit" onclick="openEditModal(${h.id})">Upravit</button>
+        <button class="btn-del" onclick="removeHabit(${h.id})">×</button>
+      </div>`).join('')+
+  `</div>`;
+  initTouch();
+}
+
+function addHabit(){
+  const input=document.getElementById('new-habit-input');
+  const name=input.value.trim();
+  if(!name)return;
+  if(data.habits.find(h=>h.name===name)){showBanner('Název již existuje');return;}
+  const usedColors=data.habits.map(h=>h.color);
+  const color=COLORS.map(c=>c.hex).find(c=>!usedColors.includes(c))||COLORS[0].hex;
+  data.habits.push({id:nextId++,name,color,icon:'⭐',goalDays:GOAL_DAYS,weekFreq:7});
+  saveData();input.value='';renderSprava();showBanner('Návyk přidán');
+}
+
+function removeHabit(id){
+  const h=data.habits.find(h=>h.id===id);
+  if(!h)return;
+  if(!confirm(`Odebrat návyk „${h.name}"?\n\nHistorie zůstane uložena.`))return;
+  data.habits=data.habits.filter(h=>h.id!==id);
+  saveData();renderSprava();showBanner('Návyk odebrán');
+}
+
+/* ── Touch drag-to-reorder (mobile fix) ── */
+function initTouch(){
+  const container=document.getElementById('sortable-list');
+  if(!container)return;
+  let dragEl=null,startY=0,startIdx=0;
+
+  container.querySelectorAll('.drag-handle').forEach(handle=>{
+    handle.addEventListener('touchstart',e=>{
+      dragEl=handle.closest('.manage-row');
+      startY=e.touches[0].clientY;
+      startIdx=[...container.querySelectorAll('.manage-row')].indexOf(dragEl);
+      dragEl.classList.add('dragging');
+    },{passive:true});
+  });
+
+  document.addEventListener('touchmove',e=>{
+    if(!dragEl)return;
+    e.preventDefault();
+    const y=e.touches[0].clientY;
+    const rows=[...container.querySelectorAll('.manage-row')];
+    rows.forEach(r=>r.classList.remove('drag-over'));
+    const target=rows.find(r=>{
+      const rect=r.getBoundingClientRect();
+      return y>=rect.top&&y<=rect.bottom&&r!==dragEl;
+    });
+    if(target)target.classList.add('drag-over');
+  },{passive:false});
+
+  document.addEventListener('touchend',e=>{
+    if(!dragEl)return;
+    const rows=[...container.querySelectorAll('.manage-row')];
+    const target=rows.find(r=>r.classList.contains('drag-over'));
+    if(target){
+      const fromIdx=rows.indexOf(dragEl);
+      const toIdx=rows.indexOf(target);
+      const reordered=[...data.habits];
+      const[moved]=reordered.splice(fromIdx,1);
+      reordered.splice(toIdx,0,moved);
+      data.habits=reordered;
+      saveData();
+    }
+    dragEl.classList.remove('dragging');
+    rows.forEach(r=>r.classList.remove('drag-over'));
+    dragEl=null;
+    renderSprava();
+  });
+
+  // Desktop drag
+  container.querySelectorAll('.manage-row').forEach(row=>{
+    row.setAttribute('draggable','true');
+    row.addEventListener('dragstart',e=>{row.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+    row.addEventListener('dragend',()=>{row.classList.remove('dragging');container.querySelectorAll('.manage-row').forEach(r=>r.classList.remove('drag-over'));});
+    row.addEventListener('dragover',e=>{e.preventDefault();container.querySelectorAll('.manage-row').forEach(r=>r.classList.remove('drag-over'));if(row!==document.querySelector('.dragging'))row.classList.add('drag-over');});
+    row.addEventListener('drop',e=>{
+      e.preventDefault();
+      const dragging=container.querySelector('.dragging');
+      if(!dragging||dragging===row)return;
+      const rows=[...container.querySelectorAll('.manage-row')];
+      const fromIdx=rows.indexOf(dragging),toIdx=rows.indexOf(row);
+      const reordered=[...data.habits];const[moved]=reordered.splice(fromIdx,1);reordered.splice(toIdx,0,moved);
+      data.habits=reordered;saveData();renderSprava();
+    });
+  });
+}
+
+/* ── Edit modal ── */
+let editHabitId=null,editColor=null,editIcon=null;
+
+function openEditModal(id){
+  editHabitId=id;
+  const h=data.habits.find(h=>h.id===id);
+  editColor=h.color;editIcon=h.icon;
+  document.getElementById('edit-modal-title').textContent=`Upravit: ${h.name}`;
+  document.getElementById('edit-name-input').value=h.name;
+  document.getElementById('edit-goal-input').value=h.goalDays||GOAL_DAYS;
+  document.getElementById('edit-freq-input').value=h.weekFreq||7;
+  document.getElementById('icon-custom-input').value='';
+  document.getElementById('edit-color-grid').innerHTML=COLORS.map(c=>
+    `<div class="color-swatch ${c.hex===editColor?'selected':''}" style="background:${c.hex}" data-hex="${c.hex}" onclick="selectColor('${c.hex}')"></div>`
+  ).join('');
+  document.getElementById('edit-icon-grid').innerHTML=ICONS.map(ic=>
+    `<button class="icon-btn ${ic===editIcon?'selected':''}" onclick="selectIcon('${ic}')">${ic}</button>`
+  ).join('');
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function selectColor(hex){
+  editColor=hex;
+  document.querySelectorAll('.color-swatch').forEach(el=>el.classList.toggle('selected',el.dataset.hex===hex));
+}
+function selectIcon(ic){
+  editIcon=ic;
+  document.querySelectorAll('.icon-btn').forEach(el=>el.classList.toggle('selected',el.textContent===ic));
+  document.getElementById('icon-custom-input').value='';
+}
+function selectCustomIcon(){
+  const val=document.getElementById('icon-custom-input').value.trim();
+  if(!val)return;
+  editIcon=val;
+  document.querySelectorAll('.icon-btn').forEach(el=>el.classList.remove('selected'));
+  showBanner('Ikona nastavena: '+val);
+}
+function closeEditModal(){document.getElementById('edit-modal').classList.remove('open');editHabitId=null;}
+function saveEdit(){
+  const name=document.getElementById('edit-name-input').value.trim();
+  if(!name)return;
+  const h=data.habits.find(h=>h.id===editHabitId);
+  h.name=name;h.color=editColor;h.icon=editIcon;
+  h.goalDays=parseInt(document.getElementById('edit-goal-input').value)||GOAL_DAYS;
+  h.weekFreq=Math.min(7,Math.max(1,parseInt(document.getElementById('edit-freq-input').value)||7));
+  saveData();closeEditModal();renderSprava();showBanner('Uloženo');
+}
+
+/* ── Export / Import ── */
+function exportData(){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='habits-zaloha.json';a.click();URL.revokeObjectURL(url);
+  showBanner('Záloha stažena');
+}
+function importData(event){
+  const file=event.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const imp=JSON.parse(e.target.result);
+      if(!imp.habits||!imp.log)throw new Error();
+      data=imp;nextId=data.habits.length?Math.max(...data.habits.map(h=>h.id))+1:1;
+      saveData();renderDnes();showBanner('Data načtena');switchTab('dnes');
+    }catch(e){showBanner('Chyba: neplatný soubor');}
+  };
+  reader.readAsText(file);event.target.value='';
+}
+function resetData(){
+  if(!confirm('Opravdu smazat VŠECHNA data?\n\nTato akce je nevratná.'))return;
+  data=JSON.parse(JSON.stringify(DEFAULT_DATA));nextId=data.habits.length+1;
+  saveData();renderDnes();switchTab('dnes');showBanner('Data smazána');
+}
+
+/* ── Init ── */
+document.getElementById('new-habit-input').addEventListener('keydown',e=>{if(e.key==='Enter')addHabit();});
+document.getElementById('note-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeNoteModal();});
+document.getElementById('edit-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeEditModal();});
+document.getElementById('detail-modal').addEventListener('click',e=>{if(e.target===e.currentTarget)closeDetailModal();});
+renderDnes();
+</script>
+</body>
+</html>
